@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#176b4d" />
+    <meta name="description" content="许子越网球训练、比赛、恢复、饮食与休息记录" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>子越训练记录</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="子越训练记录">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <strong>子越训练记录</strong>
+            <span id="todayLabel"></span>
+          </div>
+        </div>
+        <button class="icon-button" id="settingsButton" type="button" title="设置" aria-label="设置">
+          <i data-lucide="settings-2"></i>
+        </button>
+      </header>
+
+      <main>
+        <section class="view active" id="todayView" data-view="today">
+          <div class="status-strip" id="todayStatus"></div>
+
+          <section class="quick-entry" aria-labelledby="quickEntryTitle">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">快速记录</span>
+                <h1 id="quickEntryTitle">今天发生了什么？</h1>
+              </div>
+              <button class="icon-button subtle" id="voiceButton" type="button" title="语音输入" aria-label="语音输入">
+                <i data-lucide="mic"></i>
+              </button>
+            </div>
+            <textarea id="naturalInput" rows="4" placeholder="例如：今天网球训练 90 分钟，RPE 7，练了发球和正手。训练后拉伸 15 分钟，昨晚睡了 9 小时。"></textarea>
+            <div class="entry-actions">
+              <span class="input-hint" id="voiceStatus">可一次记录多个项目</span>
+              <button class="primary-button" id="parseButton" type="button">
+                <i data-lucide="wand-sparkles"></i>
+                识别内容
+              </button>
+            </div>
+            <div class="parse-preview hidden" id="parsePreview"></div>
+          </section>
+
+          <section class="today-section" aria-labelledby="todayEntriesTitle">
+            <div class="section-heading compact">
+              <div>
+                <span class="eyebrow">今日进度</span>
+                <h2 id="todayEntriesTitle">已记录</h2>
+              </div>
+              <span class="count-label" id="todayCount">0 条</span>
+            </div>
+            <div class="timeline" id="todayEntries"></div>
+          </section>
+        </section>
+
+        <section class="view" id="recordView" data-view="record">
+          <div class="page-heading">
+            <span class="eyebrow">结构化记录</span>
+            <h1>添加记录</h1>
+          </div>
+          <div class="record-type-grid" id="recordTypeGrid"></div>
+          <div class="form-panel" id="recordFormPanel"></div>
+        </section>
+
+        <section class="view" id="reportView" data-view="report">
+          <div class="page-heading report-heading">
+            <div>
+              <span class="eyebrow">每周复盘</span>
+              <h1>训练周报</h1>
+            </div>
+            <div class="week-switcher">
+              <button class="icon-button subtle" id="previousWeek" type="button" title="上一周" aria-label="上一周"><i data-lucide="chevron-left"></i></button>
+              <button class="week-label" id="currentWeekButton" type="button"></button>
+              <button class="icon-button subtle" id="nextWeek" type="button" title="下一周" aria-label="下一周"><i data-lucide="chevron-right"></i></button>
+            </div>
+          </div>
+          <div id="weeklyReport"></div>
+        </section>
+
+        <section class="view" id="historyView" data-view="history">
+          <div class="page-heading history-heading">
+            <div>
+              <span class="eyebrow">全部数据</span>
+              <h1>历史记录</h1>
+            </div>
+            <button class="icon-button subtle" id="exportButton" type="button" title="导出数据" aria-label="导出数据"><i data-lucide="download"></i></button>
+          </div>
+          <div class="filter-row" id="historyFilters"></div>
+          <div class="history-list" id="historyList"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主导航">
+        <button class="nav-item active" type="button" data-target="today"><i data-lucide="sun"></i><span>今天</span></button>
+        <button class="nav-item" type="button" data-target="record"><i data-lucide="plus-circle"></i><span>记录</span></button>
+        <button class="nav-item" type="button" data-target="report"><i data-lucide="chart-no-axes-combined"></i><span>周报</span></button>
+        <button class="nav-item" type="button" data-target="history"><i data-lucide="history"></i><span>历史</span></button>
+      </nav>
+    </div>
+
+    <dialog id="settingsDialog" class="app-dialog">
+      <form method="dialog" class="dialog-content">
+        <div class="dialog-heading">
+          <div>
+            <span class="eyebrow">偏好与数据</span>
+            <h2>设置</h2>
+          </div>
+          <button class="icon-button subtle" value="cancel" type="submit" title="关闭" aria-label="关闭"><i data-lucide="x"></i></button>
+        </div>
+        <label class="field">
+          <span>运动员姓名</span>
+          <input id="athleteNameInput" type="text" value="许子越" />
+        </label>
+        <label class="field">
+          <span>每周网球目标（次）</span>
+          <input id="tennisGoalInput" type="number" min="0" max="14" value="4" />
+        </label>
+        <label class="field">
+          <span>每周体能目标（次）</span>
+          <input id="fitnessGoalInput" type="number" min="0" max="14" value="2" />
+        </label>
+        <label class="field">
+          <span>每周恢复目标（次）</span>
+          <input id="recoveryGoalInput" type="number" min="0" max="14" value="4" />
+        </label>
+        <div class="data-actions">
+          <button class="secondary-button" id="importButton" type="button"><i data-lucide="upload"></i>导入备份</button>
+          <input id="importInput" type="file" accept="application/json" hidden />
+          <button class="secondary-button" id="loadDemoButton" type="button"><i data-lucide="database"></i>载入示例</button>
+        </div>
+        <button class="primary-button full-width" id="saveSettingsButton" value="default" type="submit">保存设置</button>
+      </form>
+    </dialog>
+
+    <dialog id="editDialog" class="app-dialog wide-dialog">
+      <div class="dialog-content" id="editDialogContent"></div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
