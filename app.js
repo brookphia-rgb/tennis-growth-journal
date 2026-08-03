@@ -569,8 +569,11 @@ function cloudStatusMeta() {
   if (state.cloud.status === "connected") return { icon: "cloud-check", className: "connected" };
   if (state.cloud.status === "syncing") return { icon: "cloud-upload", className: "syncing" };
   if (state.cloud.status === "error") return { icon: "cloud-alert", className: "error" };
-  if (state.cloud.status === "email-sent") return { icon: "mail-check", className: "syncing" };
   return { icon: "cloud-off", className: "" };
+}
+
+function signedInAccountName() {
+  return state.cloud.user?.user_metadata?.account_name || state.cloud.user?.email?.split("@")[0] || "当前账号";
 }
 
 function renderCloudSettings() {
@@ -581,10 +584,11 @@ function renderCloudSettings() {
   status.className = `cloud-status ${meta.className}`.trim();
   status.innerHTML = `<i data-lucide="${meta.icon}"></i><span>${escapeHTML(state.cloud.message)}</span>`;
   document.querySelector("#cloudDescription").textContent = signedIn
-    ? `已登录 ${state.cloud.user.email || "当前账户"}，记录会自动同步。`
-    : state.cloud.status === "email-sent" ? "请打开邮箱里的登录邮件并点击链接。" : "登录后，手机和电脑会自动使用同一份记录。";
-  document.querySelector("#cloudEmailField").hidden = signedIn;
-  document.querySelector("#sendLoginEmailButton").hidden = signedIn;
+    ? `已登录 ${signedInAccountName()}，记录会自动同步。`
+    : "登录后，手机和电脑会自动使用同一份记录。";
+  document.querySelector("#cloudCredentials").hidden = signedIn;
+  document.querySelector("#loginAccountButton").hidden = signedIn;
+  document.querySelector("#createAccountButton").hidden = signedIn;
   document.querySelector("#syncNowButton").hidden = !signedIn;
   document.querySelector("#logoutButton").hidden = !signedIn;
   document.querySelector("#syncNowButton").disabled = state.cloud.syncing;
@@ -706,26 +710,73 @@ async function syncCloudData() {
   }
 }
 
-async function sendLoginEmail() {
-  const email = document.querySelector("#cloudEmailInput").value.trim();
-  if (!email || !email.includes("@")) {
-    showToast("请输入正确的邮箱地址");
-    return;
+function accountEmail(accountName) {
+  const normalized = accountName.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, "");
+  let hash = 2166136261;
+  for (const character of normalized) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
   }
+  return `account-${(hash >>> 0).toString(36)}@xzy-tennis.app`;
+}
+
+function cloudCredentials() {
+  const accountName = document.querySelector("#cloudAccountInput").value.trim();
+  const password = document.querySelector("#cloudPasswordInput").value;
+  if (accountName.length < 2) {
+    showToast("账号至少需要 2 个字");
+    return null;
+  }
+  if (password.length < 6) {
+    showToast("密码至少需要 6 位");
+    return null;
+  }
+  return { accountName, password, email: accountEmail(accountName) };
+}
+
+async function loginWithPassword() {
+  const credentials = cloudCredentials();
+  if (!credentials) return;
   if (!state.cloud.client) {
     showToast("云端服务暂时没有加载，请稍后重试");
     return;
   }
-  setCloudStatus("syncing", "正在发送邮件");
-  const { error } = await state.cloud.client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  setCloudStatus("syncing", "正在登录");
+  const { error } = await state.cloud.client.auth.signInWithPassword({
+    email: credentials.email,
+    password: credentials.password,
+  });
   if (error) {
-    console.error("Login email failed", error);
-    setCloudStatus("error", "邮件发送失败");
-    showToast("登录邮件发送失败，请稍后重试");
+    console.error("Password login failed", error);
+    setCloudStatus("error", "登录失败");
+    showToast("账号或密码不正确");
     return;
   }
-  setCloudStatus("email-sent", "邮件已发送");
-  showToast("登录邮件已发送");
+  document.querySelector("#cloudPasswordInput").value = "";
+  showToast("登录成功");
+}
+
+async function createPasswordAccount() {
+  const credentials = cloudCredentials();
+  if (!credentials) return;
+  if (!state.cloud.client) {
+    showToast("云端服务暂时没有加载，请稍后重试");
+    return;
+  }
+  setCloudStatus("syncing", "正在创建账号");
+  const { data, error } = await state.cloud.client.auth.signUp({
+    email: credentials.email,
+    password: credentials.password,
+    options: { data: { account_name: credentials.accountName } },
+  });
+  if (error || !data.session) {
+    console.error("Account creation failed", error);
+    setCloudStatus("error", "创建失败");
+    showToast(error?.message?.toLowerCase().includes("already") ? "账号已存在，请直接登录" : "创建失败，请换一个账号重试");
+    return;
+  }
+  document.querySelector("#cloudPasswordInput").value = "";
+  showToast("账号已创建并登录");
 }
 
 async function initializeCloudSync() {
@@ -735,7 +786,7 @@ async function initializeCloudSync() {
     return;
   }
   state.cloud.client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
-    auth: { persistSession: true, detectSessionInUrl: true },
+    auth: { persistSession: true, detectSessionInUrl: false },
   });
   const { data, error } = await state.cloud.client.auth.getSession();
   if (error) console.error("Session restore failed", error);
@@ -888,7 +939,8 @@ document.querySelector("#exportButton").addEventListener("click", exportData);
 document.querySelector("#importButton").addEventListener("click", () => document.querySelector("#importInput").click());
 document.querySelector("#importInput").addEventListener("change", (event) => { if (event.target.files[0]) importData(event.target.files[0]); });
 document.querySelector("#loadDemoButton").addEventListener("click", loadDemoData);
-document.querySelector("#sendLoginEmailButton").addEventListener("click", sendLoginEmail);
+document.querySelector("#loginAccountButton").addEventListener("click", loginWithPassword);
+document.querySelector("#createAccountButton").addEventListener("click", createPasswordAccount);
 document.querySelector("#syncNowButton").addEventListener("click", syncCloudData);
 document.querySelector("#logoutButton").addEventListener("click", async () => {
   if (state.cloud.client) await state.cloud.client.auth.signOut();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "xzy-tennis-journal-v3";
+const CACHE_NAME = "xzy-tennis-journal-v4";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./config.js", "./app.js", "./manifest.webmanifest", "./assets/app-icon.svg"];
 
 self.addEventListener("install", (event) => {

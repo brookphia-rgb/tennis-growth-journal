@@ -141,12 +141,19 @@
             <span class="cloud-status" id="cloudStatus"><i data-lucide="cloud-off"></i><span>未登录</span></span>
           </div>
           <p class="cloud-copy" id="cloudDescription">登录后，手机和电脑会自动使用同一份记录。</p>
-          <label class="field" id="cloudEmailField">
-            <span>登录邮箱</span>
-            <input id="cloudEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="请输入常用邮箱" />
-          </label>
+          <div class="cloud-credentials" id="cloudCredentials">
+            <label class="field">
+              <span>账号</span>
+              <input id="cloudAccountInput" type="text" autocomplete="username" maxlength="30" placeholder="例如：许子越" />
+            </label>
+            <label class="field">
+              <span>密码</span>
+              <input id="cloudPasswordInput" type="password" autocomplete="current-password" minlength="6" placeholder="至少 6 位" />
+            </label>
+          </div>
           <div class="cloud-actions">
-            <button class="primary-button" id="sendLoginEmailButton" type="button"><i data-lucide="mail"></i>发送登录邮件</button>
+            <button class="primary-button" id="loginAccountButton" type="button"><i data-lucide="log-in"></i>登录</button>
+            <button class="secondary-button" id="createAccountButton" type="button"><i data-lucide="user-plus"></i>首次创建账号</button>
             <button class="secondary-button" id="syncNowButton" type="button" hidden><i data-lucide="refresh-cw"></i>立即同步</button>
             <button class="secondary-button" id="logoutButton" type="button" hidden><i data-lucide="log-out"></i>退出登录</button>
           </div>

@@ -295,6 +295,7 @@ svg { width: 19px; height: 19px; stroke-width: 2; }
 .cloud-status.error { color: var(--red); }
 .cloud-status svg { width: 15px; height: 15px; flex: 0 0 auto; }
 .cloud-copy { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.cloud-credentials { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cloud-actions { display: flex; gap: 8px; }
 .cloud-actions button { flex: 1; min-width: 0; }
 .data-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -327,6 +328,7 @@ svg { width: 19px; height: 19px; stroke-width: 2; }
   .metric:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
   .report-heading { display: block; }
   .week-switcher { justify-content: flex-end; margin-top: 10px; }
+  .cloud-credentials { grid-template-columns: 1fr; }
   .cloud-actions { display: grid; grid-template-columns: 1fr; }
 }
 
