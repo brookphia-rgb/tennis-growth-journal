@@ -1,5 +1,5 @@
-const CACHE_NAME = "xzy-tennis-journal-v2";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./assets/app-icon.svg"];
+const CACHE_NAME = "xzy-tennis-journal-v3";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./config.js", "./app.js", "./manifest.webmanifest", "./assets/app-icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));

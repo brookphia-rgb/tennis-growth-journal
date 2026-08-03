@@ -1,5 +1,7 @@
 const STORAGE_KEY = "xzy-tennis-journal-v1";
 const SETTINGS_KEY = "xzy-tennis-settings-v1";
+const DELETED_KEY = "xzy-tennis-deleted-v1";
+const SETTINGS_UPDATED_KEY = "xzy-tennis-settings-updated-v1";
 
 const TYPE_CONFIG = {
   tennis: { label: "网球训练", short: "网球", icon: "circle-dot", colorClass: "tennis" },
@@ -24,6 +26,8 @@ const state = {
   historyFilter: "all",
   weekOffset: 0,
   parsedDrafts: [],
+  deletedIds: loadJSON(DELETED_KEY, []),
+  cloud: { client: null, user: null, status: "offline", message: "未登录", syncing: false, syncRequested: false, timer: null },
 };
 
 function loadJSON(key, fallback) {
@@ -35,13 +39,17 @@ function loadJSON(key, fallback) {
   }
 }
 
-function persist() {
+function persist({ sync = true } = {}) {
   state.entries.sort((a, b) => `${b.date}${b.createdAt || ""}`.localeCompare(`${a.date}${a.createdAt || ""}`));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+  localStorage.setItem(DELETED_KEY, JSON.stringify(state.deletedIds));
+  if (sync) scheduleCloudSync();
 }
 
-function persistSettings() {
+function persistSettings({ touch = true, sync = true } = {}) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+  if (touch) localStorage.setItem(SETTINGS_UPDATED_KEY, new Date().toISOString());
+  if (sync) scheduleCloudSync();
 }
 
 function localISO(date = new Date()) {
@@ -308,6 +316,10 @@ function saveEntry(entry) {
   renderAll();
 }
 
+function markEntryDeleted(id) {
+  if (!state.deletedIds.includes(id)) state.deletedIds.push(id);
+}
+
 function renderHistoryFilters() {
   const filters = [["all", "全部"], ...Object.entries(TYPE_CONFIG).map(([key, value]) => [key, value.short])];
   document.querySelector("#historyFilters").innerHTML = filters.map(([key, label]) => `
@@ -550,6 +562,194 @@ function renderSettings() {
   document.querySelector("#tennisGoalInput").value = state.settings.tennisGoal;
   document.querySelector("#fitnessGoalInput").value = state.settings.fitnessGoal;
   document.querySelector("#recoveryGoalInput").value = state.settings.recoveryGoal;
+  renderCloudSettings();
+}
+
+function cloudStatusMeta() {
+  if (state.cloud.status === "connected") return { icon: "cloud-check", className: "connected" };
+  if (state.cloud.status === "syncing") return { icon: "cloud-upload", className: "syncing" };
+  if (state.cloud.status === "error") return { icon: "cloud-alert", className: "error" };
+  if (state.cloud.status === "email-sent") return { icon: "mail-check", className: "syncing" };
+  return { icon: "cloud-off", className: "" };
+}
+
+function renderCloudSettings() {
+  const status = document.querySelector("#cloudStatus");
+  if (!status) return;
+  const signedIn = Boolean(state.cloud.user);
+  const meta = cloudStatusMeta();
+  status.className = `cloud-status ${meta.className}`.trim();
+  status.innerHTML = `<i data-lucide="${meta.icon}"></i><span>${escapeHTML(state.cloud.message)}</span>`;
+  document.querySelector("#cloudDescription").textContent = signedIn
+    ? `已登录 ${state.cloud.user.email || "当前账户"}，记录会自动同步。`
+    : state.cloud.status === "email-sent" ? "请打开邮箱里的登录邮件并点击链接。" : "登录后，手机和电脑会自动使用同一份记录。";
+  document.querySelector("#cloudEmailField").hidden = signedIn;
+  document.querySelector("#sendLoginEmailButton").hidden = signedIn;
+  document.querySelector("#syncNowButton").hidden = !signedIn;
+  document.querySelector("#logoutButton").hidden = !signedIn;
+  document.querySelector("#syncNowButton").disabled = state.cloud.syncing;
+  refreshIcons();
+}
+
+function setCloudStatus(status, message) {
+  state.cloud.status = status;
+  state.cloud.message = message;
+  renderCloudSettings();
+}
+
+function entryToRow(entry) {
+  return {
+    id: entry.id,
+    user_id: state.cloud.user.id,
+    type: entry.type,
+    date: entry.date,
+    duration: entry.duration ?? null,
+    rpe: entry.rpe ?? null,
+    title: entry.title || "",
+    notes: entry.notes || "",
+    details: entry.details || {},
+    created_at: entry.createdAt || new Date().toISOString(),
+    updated_at: entry.updatedAt || entry.createdAt || new Date().toISOString(),
+  };
+}
+
+function rowToEntry(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    date: row.date,
+    duration: row.duration,
+    rpe: row.rpe,
+    title: row.title || "",
+    notes: row.notes || "",
+    details: row.details || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function newerEntry(first, second) {
+  const firstTime = Date.parse(first.updatedAt || first.createdAt || 0) || 0;
+  const secondTime = Date.parse(second.updatedAt || second.createdAt || 0) || 0;
+  return secondTime > firstTime ? second : first;
+}
+
+function scheduleCloudSync(delay = 500) {
+  if (!state.cloud.user || !state.cloud.client) return;
+  clearTimeout(state.cloud.timer);
+  state.cloud.timer = setTimeout(() => syncCloudData(), delay);
+}
+
+async function syncCloudData() {
+  if (!state.cloud.user || !state.cloud.client) return;
+  if (state.cloud.syncing) {
+    state.cloud.syncRequested = true;
+    return;
+  }
+  state.cloud.syncing = true;
+  setCloudStatus("syncing", "正在同步");
+  try {
+    if (state.deletedIds.length) {
+      const { error: deleteError } = await state.cloud.client.from("entries").delete().in("id", state.deletedIds);
+      if (deleteError) throw deleteError;
+      state.deletedIds = [];
+      persist({ sync: false });
+    }
+
+    const { data: remoteRows, error: readError } = await state.cloud.client.from("entries").select("*");
+    if (readError) throw readError;
+    const deleted = new Set(state.deletedIds);
+    const merged = new Map(state.entries.filter((entry) => !deleted.has(entry.id)).map((entry) => [entry.id, entry]));
+    (remoteRows || []).map(rowToEntry).forEach((remoteEntry) => {
+      if (deleted.has(remoteEntry.id)) return;
+      const localEntry = merged.get(remoteEntry.id);
+      merged.set(remoteEntry.id, localEntry ? newerEntry(localEntry, remoteEntry) : remoteEntry);
+    });
+    state.entries = [...merged.values()];
+    persist({ sync: false });
+    if (state.entries.length) {
+      const { error: writeError } = await state.cloud.client.from("entries").upsert(state.entries.map(entryToRow), { onConflict: "id" });
+      if (writeError) throw writeError;
+    }
+
+    const { data: remoteSettings, error: settingsReadError } = await state.cloud.client
+      .from("user_settings").select("settings, updated_at").maybeSingle();
+    if (settingsReadError) throw settingsReadError;
+    const localSettingsUpdatedAt = localStorage.getItem(SETTINGS_UPDATED_KEY) || "1970-01-01T00:00:00.000Z";
+    if (remoteSettings && Date.parse(remoteSettings.updated_at) > Date.parse(localSettingsUpdatedAt)) {
+      state.settings = { ...DEFAULT_SETTINGS, ...(remoteSettings.settings || {}) };
+      localStorage.setItem(SETTINGS_UPDATED_KEY, remoteSettings.updated_at);
+      persistSettings({ touch: false, sync: false });
+    } else {
+      const updatedAt = remoteSettings ? localSettingsUpdatedAt : new Date().toISOString();
+      const { error: settingsWriteError } = await state.cloud.client.from("user_settings").upsert({
+        user_id: state.cloud.user.id,
+        settings: state.settings,
+        updated_at: updatedAt,
+      });
+      if (settingsWriteError) throw settingsWriteError;
+      localStorage.setItem(SETTINGS_UPDATED_KEY, updatedAt);
+    }
+
+    renderAll();
+    renderSettings();
+    setCloudStatus("connected", "已同步");
+  } catch (error) {
+    console.error("Cloud sync failed", error);
+    setCloudStatus("error", navigator.onLine ? "同步失败" : "等待联网");
+  } finally {
+    state.cloud.syncing = false;
+    if (state.cloud.syncRequested) {
+      state.cloud.syncRequested = false;
+      scheduleCloudSync(100);
+    }
+  }
+}
+
+async function sendLoginEmail() {
+  const email = document.querySelector("#cloudEmailInput").value.trim();
+  if (!email || !email.includes("@")) {
+    showToast("请输入正确的邮箱地址");
+    return;
+  }
+  if (!state.cloud.client) {
+    showToast("云端服务暂时没有加载，请稍后重试");
+    return;
+  }
+  setCloudStatus("syncing", "正在发送邮件");
+  const { error } = await state.cloud.client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  if (error) {
+    console.error("Login email failed", error);
+    setCloudStatus("error", "邮件发送失败");
+    showToast("登录邮件发送失败，请稍后重试");
+    return;
+  }
+  setCloudStatus("email-sent", "邮件已发送");
+  showToast("登录邮件已发送");
+}
+
+async function initializeCloudSync() {
+  const config = window.APP_CONFIG || {};
+  if (!window.supabase || !config.supabaseUrl || !config.supabaseAnonKey) {
+    setCloudStatus("error", "云端服务未加载");
+    return;
+  }
+  state.cloud.client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: { persistSession: true, detectSessionInUrl: true },
+  });
+  const { data, error } = await state.cloud.client.auth.getSession();
+  if (error) console.error("Session restore failed", error);
+  state.cloud.user = data?.session?.user || null;
+  if (state.cloud.user) await syncCloudData();
+  else setCloudStatus("offline", "未登录");
+
+  state.cloud.client.auth.onAuthStateChange((_event, session) => {
+    window.setTimeout(() => {
+      state.cloud.user = session?.user || null;
+      if (state.cloud.user) syncCloudData();
+      else setCloudStatus("offline", "未登录");
+    }, 0);
+  });
 }
 
 function renderAll() {
@@ -653,6 +853,7 @@ document.addEventListener("click", (event) => {
   }
   const deleteButton = event.target.closest("[data-delete-id]");
   if (deleteButton && confirm("确定删除这条记录吗？")) {
+    markEntryDeleted(deleteButton.dataset.deleteId);
     state.entries = state.entries.filter((entry) => entry.id !== deleteButton.dataset.deleteId); persist();
     document.querySelector("#editDialog").close(); renderAll(); showToast("记录已删除");
   }
@@ -687,11 +888,20 @@ document.querySelector("#exportButton").addEventListener("click", exportData);
 document.querySelector("#importButton").addEventListener("click", () => document.querySelector("#importInput").click());
 document.querySelector("#importInput").addEventListener("change", (event) => { if (event.target.files[0]) importData(event.target.files[0]); });
 document.querySelector("#loadDemoButton").addEventListener("click", loadDemoData);
+document.querySelector("#sendLoginEmailButton").addEventListener("click", sendLoginEmail);
+document.querySelector("#syncNowButton").addEventListener("click", syncCloudData);
+document.querySelector("#logoutButton").addEventListener("click", async () => {
+  if (state.cloud.client) await state.cloud.client.auth.signOut();
+  state.cloud.user = null;
+  setCloudStatus("offline", "未登录");
+  showToast("已退出云端登录");
+});
 document.querySelector("#previousWeek").addEventListener("click", () => { state.weekOffset -= 1; renderWeeklyReport(); refreshIcons(); });
 document.querySelector("#nextWeek").addEventListener("click", () => { if (state.weekOffset < 0) state.weekOffset += 1; renderWeeklyReport(); refreshIcons(); });
 document.querySelector("#currentWeekButton").addEventListener("click", () => { state.weekOffset = 0; renderWeeklyReport(); refreshIcons(); });
 
-setupSpeechRecognition(); renderAll();
+window.addEventListener("online", () => scheduleCloudSync(100));
+setupSpeechRecognition(); renderAll(); initializeCloudSync();
 
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));

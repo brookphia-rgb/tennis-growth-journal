@@ -132,6 +132,25 @@
           <span>每周恢复目标（次）</span>
           <input id="recoveryGoalInput" type="number" min="0" max="14" value="4" />
         </label>
+        <section class="cloud-section" aria-labelledby="cloudSectionTitle">
+          <div class="cloud-heading">
+            <div>
+              <span class="eyebrow">跨设备使用</span>
+              <h3 id="cloudSectionTitle">云端同步</h3>
+            </div>
+            <span class="cloud-status" id="cloudStatus"><i data-lucide="cloud-off"></i><span>未登录</span></span>
+          </div>
+          <p class="cloud-copy" id="cloudDescription">登录后，手机和电脑会自动使用同一份记录。</p>
+          <label class="field" id="cloudEmailField">
+            <span>登录邮箱</span>
+            <input id="cloudEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="请输入常用邮箱" />
+          </label>
+          <div class="cloud-actions">
+            <button class="primary-button" id="sendLoginEmailButton" type="button"><i data-lucide="mail"></i>发送登录邮件</button>
+            <button class="secondary-button" id="syncNowButton" type="button" hidden><i data-lucide="refresh-cw"></i>立即同步</button>
+            <button class="secondary-button" id="logoutButton" type="button" hidden><i data-lucide="log-out"></i>退出登录</button>
+          </div>
+        </section>
         <div class="data-actions">
           <button class="secondary-button" id="importButton" type="button"><i data-lucide="upload"></i>导入备份</button>
           <input id="importInput" type="file" accept="application/json" hidden />
@@ -148,6 +167,8 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
