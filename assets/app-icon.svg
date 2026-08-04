@@ -1,5 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="球迹标志">
   <rect width="512" height="512" rx="96" fill="#176b4d"/>
-  <circle cx="256" cy="256" r="142" fill="#f2c94c"/>
-  <path d="M130 192c74 14 132 72 146 190M236 120c14 76 74 136 148 148" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round"/>
+  <path d="M82 410c22-132 105-232 242-284" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" opacity=".9"/>
+  <path d="M82 410c42-31 82-45 126-47" fill="none" stroke="#f2c94c" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="344" cy="130" r="91" fill="#f2c94c"/>
+  <path d="M285 61c12 50 60 90 119 94M278 185c48-9 87-48 99-99" fill="none" stroke="#fff" stroke-width="15" stroke-linecap="round"/>
 </svg>
