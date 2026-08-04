@@ -11,6 +11,10 @@ const TYPE_CONFIG = {
   daily: { label: "饮食休息", short: "日常", icon: "moon", colorClass: "daily" },
 };
 
+const TENNIS_TECHNIQUES = ["正手", "反手", "发球", "接发球", "截击", "高压", "切削", "放小球", "挑高球", "步法"];
+const TENNIS_TACTICS = ["综合战术", "底线相持", "主动进攻", "防守反击", "攻防转换", "随球上网", "发球局", "接发局", "关键分", "双打配合"];
+const TENNIS_TRAINING_FORMS = ["定点练习", "移动练习", "多球", "对拉", "条件对抗", "比赛模拟"];
+
 const DEFAULT_SETTINGS = {
   athleteName: "许子越",
   tennisGoal: 4,
@@ -114,7 +118,10 @@ function showToast(message) {
 function entryTitle(entry) {
   if (entry.title) return entry.title;
   const details = entry.details || {};
-  if (entry.type === "tennis") return details.focus?.length ? details.focus.join(" · ") : "网球训练";
+  if (entry.type === "tennis") {
+    const focus = tennisFocusItems(details);
+    return focus.length ? focus.join(" · ") : "网球训练";
+  }
   if (entry.type === "fitness") return details.focus?.length ? details.focus.join(" · ") : "体能训练";
   if (entry.type === "match") return details.opponent ? `对阵 ${details.opponent}` : "比赛复盘";
   if (entry.type === "recovery") return details.methods?.length ? details.methods.join(" · ") : "拉伸放松";
@@ -200,6 +207,30 @@ function checkPills(name, options, selected = []) {
     <label class="check-pill"><input type="checkbox" name="${name}" value="${escapeHTML(value)}" ${selected.includes(value) ? "checked" : ""}><span>${escapeHTML(value)}</span></label>`).join("")}</div>`;
 }
 
+function tennisDetailGroups(details = {}) {
+  const legacyMap = { "接发": "接发球", "战术": "综合战术", "底线": "底线相持", "对抗": "条件对抗" };
+  const legacyFocus = Array.isArray(details.focus) ? details.focus.map((item) => legacyMap[item] || item) : [];
+  const techniques = Array.isArray(details.techniques) && details.techniques.length
+    ? details.techniques.map((item) => legacyMap[item] || item)
+    : legacyFocus.filter((item) => TENNIS_TECHNIQUES.includes(item));
+  const tactics = Array.isArray(details.tactics) && details.tactics.length
+    ? details.tactics.map((item) => legacyMap[item] || item)
+    : legacyFocus.filter((item) => TENNIS_TACTICS.includes(item));
+  const trainingForms = Array.isArray(details.trainingForms) && details.trainingForms.length
+    ? details.trainingForms.map((item) => legacyMap[item] || item)
+    : legacyFocus.filter((item) => TENNIS_TRAINING_FORMS.includes(item));
+  return {
+    techniques: [...new Set(techniques)],
+    tactics: [...new Set(tactics)],
+    trainingForms: [...new Set(trainingForms)],
+  };
+}
+
+function tennisFocusItems(details = {}) {
+  const groups = tennisDetailGroups(details);
+  return [...groups.techniques, ...groups.tactics, ...groups.trainingForms];
+}
+
 function commonFields(entry = {}) {
   return `
     <label class="field"><span>日期</span><input name="date" type="date" required value="${escapeHTML(entry.date || localISO())}"></label>
@@ -211,12 +242,17 @@ function commonFields(entry = {}) {
 function formFieldsFor(type, entry = {}) {
   const d = entry.details || {};
   const notes = `<label class="field full"><span>笔记</span><textarea name="notes" placeholder="今天做得好的、需要改进的、身体感受……">${escapeHTML(entry.notes || "")}</textarea></label>`;
-  if (type === "tennis") return `
+  if (type === "tennis") {
+    const groups = tennisDetailGroups(d);
+    return `
     ${commonFields(entry)}
-    <div class="field full"><span>训练内容</span>${checkPills("focus", ["发球", "接发", "正手", "反手", "截击", "步法", "多球", "对抗"], d.focus || [])}</div>
+    <div class="field full tennis-options"><span>技术类型</span>${checkPills("techniques", TENNIS_TECHNIQUES, groups.techniques)}</div>
+    <div class="field full tennis-options"><span>战术主题</span>${checkPills("tactics", TENNIS_TACTICS, groups.tactics)}</div>
+    <div class="field full tennis-options training-form-options"><span>训练形式</span>${checkPills("trainingForms", TENNIS_TRAINING_FORMS, groups.trainingForms)}</div>
     <label class="field"><span>教练</span><input name="coach" type="text" value="${escapeHTML(d.coach || "")}" placeholder="教练姓名"></label>
     <label class="field"><span>完成感受</span><select name="feeling">${optionTags([["", "请选择"], ["状态很好", "状态很好"], ["基本完成", "基本完成"], ["比较吃力", "比较吃力"]], d.feeling)}</select></label>
     ${notes}`;
+  }
   if (type === "fitness") return `
     ${commonFields(entry)}
     <div class="field full"><span>训练内容</span>${checkPills("focus", ["速度", "敏捷", "力量", "爆发力", "耐力", "核心", "协调", "平衡"], d.focus || [])}</div>
@@ -291,7 +327,9 @@ function formToEntry(form) {
   };
   const d = entry.details;
   if (type === "tennis") {
-    d.focus = data.getAll("focus"); d.coach = data.get("coach"); d.feeling = data.get("feeling");
+    d.techniques = data.getAll("techniques"); d.tactics = data.getAll("tactics"); d.trainingForms = data.getAll("trainingForms");
+    d.focus = [...d.techniques, ...d.tactics, ...d.trainingForms];
+    d.coach = data.get("coach"); d.feeling = data.get("feeling");
   } else if (type === "fitness") {
     d.focus = data.getAll("focus"); d.content = data.get("content");
   } else if (type === "match") {
@@ -374,12 +412,17 @@ function parseNaturalText(text) {
   const sentences = clean.split(/[。！？!\n；;]/).map((item) => item.trim()).filter(Boolean);
   const categories = [
     ["match", ["比赛", "对阵", "比分", "赛事", "赢了", "输了", "获胜", "失利"]],
-    ["tennis", ["网球", "发球", "接发", "正手", "反手", "截击", "多球", "底线", "教练"]],
+    ["tennis", ["网球", "发球", "接发", "正手", "反手", "截击", "高压", "切削", "削球", "放小球", "挑高球", "步法", "脚步", "战术", "相持", "进攻", "反击", "上网", "关键分", "双打", "多球", "对拉", "对抗", "模拟", "底线", "教练"]],
     ["fitness", ["体能", "力量", "敏捷", "速度", "核心", "耐力", "爆发", "跑步", "跳绳"]],
     ["recovery", ["拉伸", "放松", "泡沫轴", "按摩", "热敷", "冰敷", "恢复"]],
     ["daily", ["睡", "起床", "饮食", "早餐", "午餐", "晚餐", "加餐", "饮水", "喝水", "疲劳", "精力", "体重"]],
   ];
   const present = categories.filter(([, keywords]) => keywords.some((keyword) => clean.includes(keyword)));
+  const simulationOnly = /比赛模拟|模拟比赛/.test(clean) && !/(比分|对阵|赛事|赢了|输了|获胜|失利)/.test(clean);
+  if (simulationOnly) {
+    const matchIndex = present.findIndex(([type]) => type === "match");
+    if (matchIndex >= 0) present.splice(matchIndex, 1);
+  }
   const hasMatch = present.some(([type]) => type === "match");
   const tennisIndex = present.findIndex(([type]) => type === "tennis");
   if (hasMatch && tennisIndex >= 0 && !clean.includes("训练")) present.splice(tennisIndex, 1);
@@ -395,7 +438,40 @@ function parseNaturalText(text) {
     };
     const d = entry.details;
     if (type === "tennis") {
-      d.focus = ["发球", "接发", "正手", "反手", "截击", "步法", "多球", "对抗"].filter((item) => snippet.includes(item));
+      d.techniques = TENNIS_TECHNIQUES.filter((item) => {
+        if (item === "正手") return snippet.includes("正手") || snippet.includes("正反手") || snippet.includes("正反拍");
+        if (item === "反手") return snippet.includes("反手") || snippet.includes("正反手") || snippet.includes("正反拍");
+        if (item === "发球") {
+          const techniqueText = snippet.replaceAll("发球局", "").replaceAll("接发球", "").replaceAll("接发", "");
+          return techniqueText.includes("发球") || snippet.includes("一发") || snippet.includes("二发");
+        }
+        if (item === "接发球") return snippet.replaceAll("接发局", "").includes("接发");
+        if (item === "切削") return snippet.includes("切削") || snippet.includes("削球");
+        if (item === "步法") return snippet.includes("步法") || snippet.includes("脚步");
+        return snippet.includes(item);
+      });
+      d.tactics = TENNIS_TACTICS.filter((item) => {
+        if (item === "综合战术") return snippet.includes("战术");
+        if (item === "底线相持") return snippet.includes("底线相持") || snippet.includes("相持");
+        if (item === "主动进攻") return snippet.includes("主动进攻") || snippet.includes("抢攻");
+        if (item === "防守反击") return snippet.includes("防守反击") || snippet.includes("反击");
+        if (item === "攻防转换") return snippet.includes("攻防转换") || snippet.includes("转换");
+        if (item === "随球上网") return snippet.includes("随球上网") || snippet.includes("上网");
+        if (item === "发球局") return snippet.includes("发球局");
+        if (item === "接发局") return snippet.includes("接发局");
+        if (item === "关键分") return snippet.includes("关键分");
+        if (item === "双打配合") return snippet.includes("双打") || snippet.includes("双打配合");
+        return false;
+      });
+      if (d.tactics.length > 1) d.tactics = d.tactics.filter((item) => item !== "综合战术");
+      d.trainingForms = TENNIS_TRAINING_FORMS.filter((item) => {
+        if (item === "定点练习") return snippet.includes("定点") || snippet.includes("定线");
+        if (item === "移动练习") return snippet.includes("移动练习") || snippet.includes("移动多球");
+        if (item === "条件对抗") return snippet.includes("条件对抗") || snippet.includes("对抗");
+        if (item === "比赛模拟") return snippet.includes("比赛模拟") || snippet.includes("模拟比赛") || snippet.includes("实战");
+        return snippet.includes(item);
+      });
+      d.focus = [...d.techniques, ...d.tactics, ...d.trainingForms];
       d.feeling = /很好|不错|顺利/.test(snippet) ? "状态很好" : /累|吃力|不好/.test(snippet) ? "比较吃力" : "";
     } else if (type === "fitness") {
       d.focus = ["速度", "敏捷", "力量", "爆发力", "耐力", "核心", "协调", "平衡"].filter((item) => snippet.includes(item.replace("力", "")) || snippet.includes(item));
@@ -495,10 +571,17 @@ function buildInsights(stats, previousStats) {
 
 function planningAdvice(stats) {
   const advice = [];
-  const tennisFocus = stats.byType.tennis.flatMap((entry) => entry.details?.focus || []);
-  const counts = tennisFocus.reduce((acc, item) => { acc[item] = (acc[item] || 0) + 1; return acc; }, {});
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (top) advice.push(`技术训练：延续“${top}”主题，同时安排一次对抗检验训练迁移。`);
+  const tennisGroups = stats.byType.tennis.map((entry) => tennisDetailGroups(entry.details));
+  const techniqueCounts = tennisGroups.flatMap((group) => group.techniques)
+    .reduce((acc, item) => { acc[item] = (acc[item] || 0) + 1; return acc; }, {});
+  const tacticCounts = tennisGroups.flatMap((group) => group.tactics)
+    .reduce((acc, item) => { acc[item] = (acc[item] || 0) + 1; return acc; }, {});
+  const topTechnique = Object.entries(techniqueCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const topTactic = Object.entries(tacticCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (topTechnique) {
+    const tacticText = topTactic ? `，并继续检验“${topTactic}”` : "，同时安排一次条件对抗检验训练迁移";
+    advice.push(`技术训练：延续“${topTechnique}”主题${tacticText}。`);
+  }
   else advice.push("技术训练：下周为每次网球训练设定一个明确主题，并在笔记里记录完成质量。");
   advice.push(stats.byType.fitness.length < state.settings.fitnessGoal
     ? "体能训练：安排 2 次短单元，一次速度敏捷、一次核心与下肢稳定。"
@@ -852,12 +935,12 @@ function loadDemoData() {
   const monday = startOfWeek(new Date());
   const dates = Array.from({ length: 6 }, (_, index) => localISO(addDays(monday, index)));
   const demo = [
-    { type: "tennis", date: dates[0], duration: 90, rpe: 6, details: { focus: ["正手", "步法"], feeling: "基本完成" }, notes: "正手击球点更稳定，移动中还容易靠得太近。" },
+    { type: "tennis", date: dates[0], duration: 90, rpe: 6, details: { techniques: ["正手", "步法"], tactics: ["主动进攻"], trainingForms: ["移动练习", "多球"], focus: ["正手", "步法", "主动进攻", "移动练习", "多球"], feeling: "基本完成" }, notes: "正手击球点更稳定，移动中还容易靠得太近。" },
     { type: "recovery", date: dates[0], duration: 15, rpe: null, details: { methods: ["静态拉伸"], bodyParts: ["大腿", "小腿"], sorenessBefore: 4, sorenessAfter: 2 }, notes: "" },
     { type: "daily", date: dates[0], details: { sleepHours: 9, sleepQuality: 4, hydration: 1800, energy: 4, fatigue: 2, mealQuality: "规律均衡", meals: "三餐正常" }, notes: "" },
     { type: "fitness", date: dates[1], duration: 45, rpe: 7, details: { focus: ["敏捷", "核心"], content: "绳梯 4 组，折返跑 6 组，核心循环 3 组" }, notes: "后两组折返跑脚步变慢。" },
     { type: "daily", date: dates[1], details: { sleepHours: 8.5, sleepQuality: 4, hydration: 1600, energy: 4, fatigue: 3, mealQuality: "基本正常", meals: "" }, notes: "" },
-    { type: "tennis", date: dates[2], duration: 120, rpe: 8, details: { focus: ["发球", "接发", "对抗"], feeling: "比较吃力" }, notes: "一区外角发球成功率不错，二发偏保守。" },
+    { type: "tennis", date: dates[2], duration: 120, rpe: 8, details: { techniques: ["发球", "接发球"], tactics: ["发球局", "接发局", "关键分"], trainingForms: ["条件对抗"], focus: ["发球", "接发球", "发球局", "接发局", "关键分", "条件对抗"], feeling: "比较吃力" }, notes: "一区外角发球成功率不错，二发偏保守。" },
     { type: "recovery", date: dates[2], duration: 20, rpe: null, details: { methods: ["泡沫轴", "静态拉伸"], bodyParts: ["腰髋", "大腿"] }, notes: "" },
     { type: "daily", date: dates[2], details: { sleepHours: 8, sleepQuality: 3, hydration: 2000, energy: 3, fatigue: 4, mealQuality: "规律均衡", meals: "训练后补充牛奶和香蕉" }, notes: "" },
     { type: "match", date: dates[4], duration: 95, rpe: 8, details: { competition: "周末积分赛", opponent: "示例对手", result: "win", score: "6-4 6-3", surface: "硬地", review: "领先时一发更果断；4-3 的破发点通过连续压反手得分。" }, notes: "下一场需要减少接发抢攻失误。" },
