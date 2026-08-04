@@ -1,6 +1,6 @@
 {
-  "name": "许子越网球成长记录",
-  "short_name": "子越训练",
+  "name": "球迹 - 网球成长记录",
+  "short_name": "球迹",
   "description": "网球训练、比赛、体能、恢复、饮食与休息记录",
   "start_url": "./",
   "display": "standalone",

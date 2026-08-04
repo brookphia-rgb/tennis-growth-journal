@@ -60,16 +60,18 @@ button { cursor: pointer; }
   backdrop-filter: blur(14px);
 }
 
-.brand { display: flex; align-items: center; gap: 11px; }
+.brand { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border: 8px solid var(--yellow);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(24, 33, 29, 0.12);
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 8px;
 }
-.brand strong { display: block; font-size: 15px; line-height: 1.3; }
-.brand span:last-child { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.brand-copy { min-width: 0; }
+.brand-heading { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+.brand strong { flex: 0 0 auto; font-size: 17px; line-height: 1.2; }
+.brand-subtitle { overflow: hidden; color: #46524b; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.brand-date { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.2; }
 
 main { min-height: calc(100vh - 132px); padding-bottom: 78px; }
 .view { display: none; }

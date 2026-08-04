@@ -1,4 +1,4 @@
-const CACHE_NAME = "xzy-tennis-journal-v5";
+const CACHE_NAME = "qiuji-tennis-journal-v6";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./supabase.js", "./config.js", "./app.js", "./manifest.webmanifest", "./assets/app-icon.svg"];
 
 self.addEventListener("install", (event) => {

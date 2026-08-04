@@ -147,7 +147,6 @@ function renderHeader() {
     day: "numeric",
     weekday: "short",
   });
-  document.querySelector(".brand strong").textContent = `${state.settings.athleteName}训练记录`;
 }
 
 function renderToday() {
@@ -829,7 +828,7 @@ function exportData() {
   const blob = new Blob([data], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url; link.download = `许子越训练记录-${localISO()}.json`; link.click();
+  link.href = url; link.download = `球迹-网球成长记录-${localISO()}.json`; link.click();
   URL.revokeObjectURL(url); showToast("数据已导出");
 }
 
